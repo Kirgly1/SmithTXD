@@ -20,31 +20,17 @@ cursor.execute('''
     )
 ''')
 
-# Создаем таблицу Provider
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS Provider (
-        Human_ID INTEGER PRIMARY KEY,
-        Material_ID INTEGER,
-        name TEXT,
-        surname TEXT,
-        work_experience INTEGER,
-        price_per_kg INTEGER,
-        FOREIGN KEY (Human_ID) REFERENCES Blacksmith(Human_ID),
-        FOREIGN KEY (Material_ID) REFERENCES RawMaterial(Material_ID)
-    )
-''')
-
 # Создаем таблицу RawMaterial
 cursor.execute('''
-    CREATE TABLE IF NOT EXISTS RawMaterial (
-        Material_ID INTEGER PRIMARY KEY,
-        Provider_ID INTEGER,
-        material TEXT,
-        heat_capacity INTEGER,
-        price INTEGER,
-        FOREIGN KEY (Provider_ID) REFERENCES Provider(Human_ID)
-    )
-''')
+            CREATE TABLE IF NOT EXISTS RawMaterial (
+                Material_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Provider_ID INTEGER,
+                material TEXT,
+                heat_capacity INTEGER,
+                price INTEGER,
+                FOREIGN KEY (Provider_ID) REFERENCES Provider (Provider_ID) ON DELETE CASCADE
+            )
+        ''')
 
 # Создаем таблицу Anvil
 cursor.execute('''
@@ -52,7 +38,7 @@ cursor.execute('''
         Human_ID INTEGER PRIMARY KEY,
         genus TEXT,
         durability INTEGER,
-        FOREIGN KEY (Human_ID) REFERENCES Blacksmith(Human_ID)
+        FOREIGN KEY (Human_ID) REFERENCES Blacksmith(Human_ID) ON DELETE CASCADE
     )
 ''')
 
@@ -65,7 +51,7 @@ cursor.execute('''
         appointment TEXT,
         weight INTEGER,
         endurance INTEGER,
-        FOREIGN KEY (Human_ID) REFERENCES Blacksmith(Human_ID)
+        FOREIGN KEY (Human_ID) REFERENCES Blacksmith(Human_ID) ON DELETE CASCADE
     )
 ''')
 
@@ -78,10 +64,23 @@ cursor.execute('''
         fabric TEXT,
         time_last INTEGER,
         maximum_temperature INTEGER,
-        FOREIGN KEY (Material_ID) REFERENCES RawMaterial(Material_ID),
-        FOREIGN KEY (Product_ID) REFERENCES Product(Human_ID)
+        FOREIGN KEY (Material_ID) REFERENCES RawMaterial(Material_ID) ON DELETE CASCADE,
+        FOREIGN KEY (Product_ID) REFERENCES Product(Human_ID) ON DELETE CASCADE
     )
 ''')
+
+# Создаем таблицу Provider
+cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Provider (
+                Human_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Material_ID INTEGER,
+                name TEXT,
+                surname TEXT,
+                work_experience INTEGER,
+                price_per_kg INTEGER,
+                FOREIGN KEY (Material_ID) REFERENCES RawMaterial (Material_ID) ON DELETE CASCADE
+            )
+        ''')
 
 conn.commit()
 
@@ -93,21 +92,33 @@ class DatabaseApp:
     def __init__(self, master):
         self.master = master
         self.master.title("Database App")
-        self.master.geometry("1000x800")
+        self.master.geometry("800x400")
 
         self.conn = sqlite3.connect('blacksmith.db')
         self.cursor = self.conn.cursor()
 
-        # self.populate_tables()
-        self.create_widgets()
+        self.listbox = tk.Listbox(self.master)
+        self.listbox.pack(expand="yes", fill="both")
+
+        # Кнопка для удаления выбранных записей
+        self.delete_button = tk.Button(self.master, text="Delete Selected", command=self.delete_selected)
+        self.delete_button.pack()
+
+        # Кнопки для открытия каждой таблицы
+        table_buttons = tk.Frame(self.master)
+        table_buttons.pack()
+
+        # Заполнение таблиц при запуске приложения
+        self.populate_tables()
+
+        # Каскадное удаление
+        self.cursor.execute('PRAGMA foreign_keys = ON')
 
         # Завершение программы
         master.protocol("WM_DELETE_WINDOW", self.close_connection)
 
-    def close_connection(self):
-        # Закрытие соединения при выходе из программы
-        self.conn.close()
-        self.master.destroy()
+        # Одна функция create_widgets
+        self.create_widgets()
 
     def populate_tables(self):
         # Проверяем наличие данных в таблицах,
@@ -121,45 +132,53 @@ class DatabaseApp:
                 birthdate = datetime.datetime(2000, 1, 1)
                 work_experience = random.randint(1, 10)
                 self.cursor.execute('''
-                    INSERT INTO Blacksmith (name, surname, birthdate, work_experience)
-                    VALUES (?, ?, ?, ?)
-                ''', (name, surname, birthdate, work_experience))
+                                INSERT INTO Blacksmith (name, surname, birthdate, work_experience)
+                                VALUES (?, ?, ?, ?)
+                            ''', (name, surname, birthdate, work_experience))
 
-        # Заполняем таблицу RawMaterial
-        materials = ["Steel", "Iron", "Aluminum", "Copper", "Gold"]
-        used_provider_ids = set()
-        for provider_id in range(1, 11):
-            while provider_id in used_provider_ids:
-                provider_id = random.randint(1, 50)
+            # Заполняем таблицу RawMaterial (пример заполнения, вы можете изменить по вашему усмотрению)
+            materials = ["Steel", "Iron", "Aluminum", "Copper", "Gold"]
+            used_provider_ids = set()
+            for provider_id in range(1, 11):
+                while provider_id in used_provider_ids:
+                    provider_id = random.randint(1, 10)
 
-            material = random.choice(materials)
-            heat_capacity = random.randint(200, 1000)
-            price = random.randint(100, 500)
-            used_provider_ids.add(provider_id)
+                material = random.choice(materials)
+                heat_capacity = random.randint(200, 1000)
+                price = random.randint(100, 500)
+                used_provider_ids.add(provider_id)
 
-            self.cursor.execute('''
-                INSERT INTO RawMaterial (Provider_ID, material, heat_capacity, price)
-                VALUES (?, ?, ?, ?)
-            ''', (provider_id, material, heat_capacity, price))
+                self.cursor.execute('''
+                        INSERT INTO RawMaterial (Provider_ID, material, heat_capacity, price)
+                        VALUES (?, ?, ?, ?)
+                    ''', (provider_id, material, heat_capacity, price))
 
-        # Заполняем таблицу Provider
-        for _ in range(10):
-            name = f"ProviderName{_}"
-            surname = f"ProviderSurname{_}"
-            work_experience = random.randint(1, 10)
-            price_per_kg = random.randint(50, 200)
+                self.conn.commit()
 
-            existing_human_ids = [row[0] for row in self.cursor.execute('SELECT Human_ID FROM Provider').fetchall()]
-            human_id = random.randint(1, 50)
-            while human_id in existing_human_ids:
-                human_id = random.randint(1, 50)
+            # Заполняем Listbox
+            self.execute_query()
 
-            material_id = random.randint(1, 50)
+            # Заполняем таблицу Provider
+            for _ in range(10):
+                name = f"ProviderName{_}"
+                surname = f"ProviderSurname{_}"
+                work_experience = random.randint(1, 10)
+                price_per_kg = random.randint(50, 200)
 
-            self.cursor.execute('''
-                INSERT INTO Provider (Human_ID, Material_ID, name, surname, work_experience, price_per_kg)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (human_id, material_id, name, surname, work_experience, price_per_kg))
+                existing_human_ids = [row[0] for row in self.cursor.execute('SELECT Human_ID FROM Provider').fetchall()]
+                used_ids = set(existing_human_ids)
+                while True:
+                    human_id = random.randint(1, 10)
+                    if human_id not in used_ids:
+                        used_ids.add(human_id)
+                        break
+
+                material_id = random.randint(1, 10)
+
+                self.cursor.execute('''
+                        INSERT INTO Provider (Human_ID, Material_ID, name, surname, work_experience, price_per_kg)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ''', (human_id, material_id, name, surname, work_experience, price_per_kg))
 
         # Заполняем таблицу Anvil
         for _ in range(10):
@@ -167,9 +186,9 @@ class DatabaseApp:
             durability = random.randint(50, 200)
             existing_human_ids = [row[0] for row in self.cursor.execute('SELECT Human_ID FROM Anvil').fetchall()]
 
-            human_id = random.randint(1, 50)
+            human_id = random.randint(1, 10)
             while human_id in existing_human_ids:
-                human_id = random.randint(1, 50)
+                human_id = random.randint(1, 10)
 
             self.cursor.execute('''
                 INSERT INTO Anvil (Human_ID, genus, durability)
@@ -185,9 +204,9 @@ class DatabaseApp:
             endurance = random.randint(1, 10)
 
             existing_human_ids = [row[0] for row in self.cursor.execute('SELECT Human_ID FROM Product').fetchall()]
-            human_id = random.randint(1, 50)
+            human_id = random.randint(1, 10)
             while human_id in existing_human_ids:
-                human_id = random.randint(1, 50)
+                human_id = random.randint(1, 10)
 
             self.cursor.execute('''
                 INSERT INTO Product (Human_ID, type, size, appointment, weight, endurance)
@@ -208,10 +227,13 @@ class DatabaseApp:
 
         self.conn.commit()
 
-    def create_widgets(self):
-        self.treeview = ttk.Treeview(self.master)
-        self.treeview.pack(expand="yes", fill="both")
+    def close_connection(self):
+        # Закрытие соединения при выходе из программы
+        self.conn.commit()
+        self.conn.close()
+        self.master.destroy()
 
+    def create_widgets(self):
         self.custom_query_button = tk.Button(self.master, text="Поиск по именам и фамилиям кузнецов, "
                                                                "типам, размерам и весу продуктов, "
                                                                "а также виды и прочность наковален",
@@ -233,8 +255,13 @@ class DatabaseApp:
                                command=lambda name=table_name: self.display_table(name))
             button.pack(side="left")
 
-    def execute_new_query(self):
+        self.treeview = ttk.Treeview(self.master)
+        self.treeview.pack(expand="yes", fill="both")
 
+        # Заполнение Treeview при создании
+        self.execute_query()
+
+    def execute_new_query(self):
         query_text = "SELECT * FROM Provider WHERE work_experience = '5' AND price_per_kg = 140"
 
         try:
@@ -255,8 +282,43 @@ class DatabaseApp:
         except Exception as e:
             messagebox.showerror("Error", f"Query execution error: {str(e)}")
 
-    def execute_custom_query_custom(self):
+    def execute_query(self, query_text=None):
+        if not query_text:
+            query_text = "SELECT * FROM Blacksmith"
+        self.cursor.execute(query_text)
+        rows = self.cursor.fetchall()
 
+        # Очищаем Listbox перед заполнением новыми данными
+        self.listbox.delete(0, tk.END)
+
+        # Заполняем данными
+        for row in rows:
+            self.listbox.insert(tk.END, row)
+
+    def delete_selected(self):
+        # Получаем выделенные элементы Listbox
+        selected_items = self.listbox.curselection()
+
+        if not selected_items:
+            messagebox.showinfo("Information", "No items selected for deletion.")
+            return
+
+        # Запрос пользователя на подтверждение удаления
+        confirmation = messagebox.askyesno("Confirmation", "Are you sure you want to delete the selected items?")
+
+        if confirmation:
+            for item_index in reversed(selected_items):
+                # Получаем ID записи из Listbox
+                item_id = self.listbox.get(item_index)[0]
+                self.cursor.execute(f"DELETE FROM Blacksmith WHERE Human_ID = ?", (item_id,))
+
+            # Сохраняем изменения в базе данных
+            self.conn.commit()
+
+            # Обновляем Listbox после удаления
+            self.execute_query()
+
+    def execute_custom_query_custom(self):
         query_text = """
         SELECT Blacksmith.name AS BlacksmithName, Blacksmith.surname AS BlacksmithSurname,
                Product.type AS ProductType, Product.size AS ProductSize, Product.weight AS ProductWeight,
@@ -268,7 +330,6 @@ class DatabaseApp:
         """
 
         try:
-
             result = self.cursor.execute(query_text).fetchall()
 
             result_window = tk.Toplevel(self.master)
@@ -290,18 +351,19 @@ class DatabaseApp:
 
         columns = [desc[0] for desc in self.cursor.description]
         self.treeview["columns"] = columns
-        self.treeview["show"] = "headings"  # Это позволяет скрыть пустую колонку слева
+        self.treeview["show"] = "headings"
 
         for col in columns:
             self.treeview.heading(col, text=col)
-            self.treeview.column(col, anchor=tk.CENTER, width=100)  # Задайте желаемую ширину столбца
+            self.treeview.column(col, anchor=tk.CENTER, width=100)
 
-        for i, row in enumerate(rows):
+        for i, row in enumerate(result):
             self.treeview.insert("", i, text=row[0], values=row[1:])
 
     def display_table(self, table_name):
         rows = self.cursor.execute(f'SELECT * FROM {table_name}').fetchall()
 
+        # Получаем имена столбцов из описания таблицы
         self.cursor.execute(f'PRAGMA table_info({table_name})')
         column_names = [column[1] for column in self.cursor.fetchall()]
 
@@ -326,3 +388,5 @@ class DatabaseApp:
 root = tk.Tk()
 app = DatabaseApp(root)
 root.mainloop()
+
+
