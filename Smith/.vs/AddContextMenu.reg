@@ -1,0 +1,7 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.txt\shell\YourContextMenu]
+@="Показать размер файла"
+
+[HKEY_CLASSES_ROOT\SystemFileAssociations\.txt\shell\YourContextMenu\command]
+@="cmd.exe /k echo Размер файла: && dir /-c \"%1\" && pause"
